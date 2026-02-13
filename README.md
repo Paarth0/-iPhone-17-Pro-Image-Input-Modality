@@ -1,4 +1,4 @@
-# iPhone 17 Pro Vision Router Simulation
+# iPhone 17 Pro Image Input Modality
 
 [![Tests](https://img.shields.io/badge/tests-63%20passed-brightgreen)]()
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)]()
