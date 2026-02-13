@@ -1,0 +1,134 @@
+cat > src/pipeline/resolution_scaler.py << 'EOF'
+"""
+Resolution Scaler Module
+========================
+Implements CFR-1: Thermal-aware image resizing.
+
+Reference: Spec Table 8.2 - Dynamic Resolution Logic
+
+Thermal State Mapping:
+- NOMINAL:  768x768 (Full quality)
+- FAIR:     512x512 (Reduced)
+- SERIOUS:  256x256 (Minimum)
+- CRITICAL: 256x256 (Minimum)
+"""
+
+from enum import Enum
+from typing import Tuple
+import numpy as np
+import cv2
+
+
+class ThermalState(Enum):
+    """
+    Device thermal states that affect processing resolution.
+    
+    Maps to the iPhone 17 Pro's thermal monitoring system,
+    simulated via CLI flags for laptop validation.
+    """
+    NOMINAL = "nominal"    # Normal operating temperature
+    FAIR = "fair"          # Slightly elevated
+    SERIOUS = "serious"    # Thermal throttling begins
+    CRITICAL = "critical"  # Maximum throttling
+
+
+class ResolutionScaler:
+    """
+    Thermal-aware resolution scaler.
+    
+    Dynamically adjusts image resolution based on simulated
+    device thermal state to prevent overheating while
+    maintaining acceptable image quality.
+    
+    Reference: Spec Section 3.2 - Dynamic Resolution Logic
+    
+    Example:
+        >>> scaler = ResolutionScaler()
+        >>> resolution = scaler.get_resolution(ThermalState.NOMINAL)
+        >>> print(resolution)  # (768, 768)
+    """
+    
+    # Resolution targets per thermal state (width, height)
+    # Reference: Spec Table 8.2
+    RESOLUTION_MAP = {
+        ThermalState.NOMINAL: (768, 768),
+        ThermalState.FAIR: (512, 512),
+        ThermalState.SERIOUS: (256, 256),
+        ThermalState.CRITICAL: (256, 256),
+    }
+    
+    # Default fallback resolution
+    DEFAULT_RESOLUTION = (512, 512)
+    
+    def __init__(self):
+        """Initialize the resolution scaler."""
+        pass
+    
+    @classmethod
+    def get_resolution(cls, thermal_state: ThermalState) -> Tuple[int, int]:
+        """
+        Get target resolution for given thermal state.
+        
+        Args:
+            thermal_state: Current device thermal state
+            
+        Returns:
+            Tuple of (width, height) for target resolution
+        """
+        return cls.RESOLUTION_MAP.get(thermal_state, cls.DEFAULT_RESOLUTION)
+    
+    @classmethod
+    def resize_image(cls, image: np.ndarray, thermal_state: ThermalState) -> np.ndarray:
+        """
+        Resize image based on thermal state.
+        
+        Uses INTER_AREA interpolation for downscaling (best quality)
+        and INTER_LINEAR for upscaling.
+        
+        Args:
+            image: Input image as numpy array (BGR format from OpenCV)
+            thermal_state: Current device thermal state
+            
+        Returns:
+            Resized image as numpy array
+        """
+        target = cls.get_resolution(thermal_state)
+        current_size = (image.shape[1], image.shape[0])  # (width, height)
+        
+        # Skip if already at target size
+        if current_size == target:
+            return image
+        
+        # Choose interpolation method based on scaling direction
+        if current_size[0] > target[0] or current_size[1] > target[1]:
+            # Downscaling - use INTER_AREA for best quality
+            interpolation = cv2.INTER_AREA
+        else:
+            # Upscaling - use INTER_LINEAR
+            interpolation = cv2.INTER_LINEAR
+        
+        resized = cv2.resize(image, target, interpolation=interpolation)
+        return resized
+    
+    @classmethod
+    def get_scale_factor(cls, original_size: Tuple[int, int], thermal_state: ThermalState) -> float:
+        """
+        Calculate the scale factor for a given thermal state.
+        
+        Args:
+            original_size: Original image (width, height)
+            thermal_state: Current device thermal state
+            
+        Returns:
+            Scale factor (< 1.0 means downscaling)
+        """
+        target = cls.get_resolution(thermal_state)
+        scale_w = target[0] / original_size[0]
+        scale_h = target[1] / original_size[1]
+        return min(scale_w, scale_h)
+    
+    @staticmethod
+    def get_all_resolutions() -> dict:
+        """Get all thermal state to resolution mappings."""
+        return {state.value: res for state, res in ResolutionScaler.RESOLUTION_MAP.items()}
+EOF

@@ -1,0 +1,11 @@
+venv/
+models/*.onnx
+__pycache__/
+*.py[cod]
+*.so
+*.dylib
+.DS_Store
+.idea/
+.vscode/
+data/output/*.json
+.pytest_cache/
